@@ -1,9 +1,11 @@
 using AsyncIO;
 using NetMQ;
 using NetMQ.Sockets;
+using Unity.Collections;
 using UnityEngine;
+using UnityEngine.Rendering;
 
-public class ZmqCamera : MonoBehaviour
+public sealed class ZmqCamera : MonoBehaviour
 {
     public string address = "tcp://*:5556";
     public string topic = "camera";
@@ -43,14 +45,6 @@ public class ZmqCamera : MonoBehaviour
         _publisher.SendBytes(_texture.GetRawTextureData());
 
         RenderTexture.active = prevTexture;
-    }
-
-    public class AsyncPixelReader
-    {
-        public void ReadPixels(Texture2D texture)
-        {
-            
-        }
     }
 }
 
