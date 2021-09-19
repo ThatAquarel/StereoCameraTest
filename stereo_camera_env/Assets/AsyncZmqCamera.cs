@@ -8,35 +8,35 @@ public sealed class AsyncZmqCamera : MonoBehaviour
 {
     public string address = "tcp://*:5556";
     public string topic = "camera";
+    public int frameWidth = 1920;
+    public int frameHeight = 1080;
     public int fps = 30;
 
-    (RenderTexture grab, RenderTexture flip) _rt;
-    NativeArray<byte>[] _buffers;
+    private (RenderTexture grab, RenderTexture flip) _rt;
+    private NativeArray<byte>[] _buffers;
     private Camera _camera;
     private ZmqPublisher _publisher;
+    private bool _isRunning = true;
 
     IEnumerator Start()
     {
         _publisher = new ZmqPublisher(address, topic);
 
+        _rt.grab = new RenderTexture(frameWidth, frameHeight, 0);
+        _rt.flip = new RenderTexture(frameWidth, frameHeight, 0);
         _camera = GetComponent<Camera>();
-        var (w, h) = (1920, 1080);
-
-        _rt.grab = new RenderTexture(w, h, 0);
-        _rt.flip = new RenderTexture(w, h, 0);
-
         _camera.targetTexture = _rt.grab;
 
         _buffers = new NativeArray<byte>[fps];
         for (int i = 0; i < fps; i++)
         {
-            _buffers[i] = new NativeArray<byte>(w * h * 4, Allocator.Persistent,
-                NativeArrayOptions.UninitializedMemory);
+            _buffers[i] = new NativeArray<byte>(frameWidth * frameHeight * 4,
+                Allocator.Persistent, NativeArrayOptions.UninitializedMemory);
         }
 
         float frameTime = 1f / fps;
         int frameCount = 0;
-        while (true)
+        while (_isRunning)
         {
             yield return new WaitForSeconds(frameTime);
             yield return new WaitForEndOfFrame();
@@ -52,17 +52,15 @@ public sealed class AsyncZmqCamera : MonoBehaviour
 
     void OnDestroy()
     {
-        _publisher.Destroy();
+        _isRunning = false;
+
+        _publisher.Dispose();
 
         AsyncGPUReadback.WaitAllRequests();
-
         Destroy(_rt.flip);
         Destroy(_rt.grab);
 
-        foreach (NativeArray<byte> buffer in _buffers)
-        {
-            buffer.Dispose();
-        }
+        foreach (NativeArray<byte> buffer in _buffers) buffer.Dispose();
     }
 
     void OnCompleteReadback(AsyncGPUReadbackRequest request)
