@@ -2,20 +2,20 @@
 using AsyncIO;
 using NetMQ;
 using NetMQ.Sockets;
+using UnityEngine;
 
 public sealed class ZmqPublisher : IDisposable
 {
+    public static ZmqPublisher Instance { get; } = new ZmqPublisher();
+
     private readonly PublisherSocket _publisherSocket;
-    private readonly string _topic;
+    private string _address;
 
-    public ZmqPublisher(string address, string topic)
+    private ZmqPublisher()
     {
-        _topic = topic;
-
         ForceDotNet.Force();
         NetMQConfig.Cleanup();
         _publisherSocket = new PublisherSocket();
-        _publisherSocket.Bind(address);
     }
 
     public void Dispose()
@@ -26,10 +26,25 @@ public sealed class ZmqPublisher : IDisposable
         NetMQConfig.Cleanup();
     }
 
-    public void SendBytes(byte[] bytes)
+    public void Bind(string address)
+    {
+        if (_address == null)
+        {
+            _publisherSocket.Bind(address);
+            _address = address;
+        }
+        else if (address != _address)
+        {
+            Debug.LogException(
+                new ArgumentException(
+                    "Cannot bind to another address"));
+        }
+    }
+
+    public void SendBytes(string topic, byte[] bytes)
     {
         _publisherSocket
-            .SendMoreFrame(_topic)
+            .SendMoreFrame(topic)
             .SendFrame(bytes);
     }
 }

@@ -19,12 +19,12 @@ public sealed class AsyncZmqCamera : MonoBehaviour
     private (RenderTexture grab, RenderTexture flip) _rt;
     private NativeArray<byte>[] _buffers;
     private Camera _camera;
-    private ZmqPublisher _publisher;
+
     private bool _isRunning = true;
 
     IEnumerator Start()
     {
-        _publisher = new ZmqPublisher(address, topic);
+        ZmqPublisher.Instance.Bind(address);
 
         _rt.grab = new RenderTexture(frameWidth, frameHeight, 0);
         _rt.flip = new RenderTexture(frameWidth, frameHeight, 0);
@@ -37,10 +37,11 @@ public sealed class AsyncZmqCamera : MonoBehaviour
         // causes-invalidoperationexception-on-nativearray.1011955/
 
         _buffers = new NativeArray<byte>[fps];
-        for (int i = 0; i < fps; i++)
+        int bufferSize = frameWidth * frameHeight * 4;
+        for (int i = 0; i < _buffers.Length; i++)
         {
-            _buffers[i] = new NativeArray<byte>(frameWidth * frameHeight * 4,
-                Allocator.Persistent, NativeArrayOptions.UninitializedMemory);
+            _buffers[i] = new NativeArray<byte>(bufferSize, Allocator.Persistent, 
+                NativeArrayOptions.UninitializedMemory);
         }
 
         float frameTime = 1f / fps;
@@ -65,7 +66,7 @@ public sealed class AsyncZmqCamera : MonoBehaviour
         Destroy(_rt.flip);
         Destroy(_rt.grab);
         foreach (NativeArray<byte> buffer in _buffers) buffer.Dispose();
-        _publisher.Dispose();
+        ZmqPublisher.Instance.Dispose();
 
         _isRunning = false;
     }
@@ -78,6 +79,6 @@ public sealed class AsyncZmqCamera : MonoBehaviour
             return;
         }
 
-        _publisher.SendBytes(request.GetData<byte>().ToArray());
+        ZmqPublisher.Instance.SendBytes(topic, request.GetData<byte>().ToArray());
     }
 }
