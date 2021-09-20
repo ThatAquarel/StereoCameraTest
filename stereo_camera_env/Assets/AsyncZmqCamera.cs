@@ -1,9 +1,13 @@
+// A lot of this code is copied from here:
+// https://github.com/keijiro/AsyncCaptureTest/blob/master/Assets/AsyncCapture.cs
+
 using System;
 using System.Collections;
 using Unity.Collections;
 using UnityEngine;
 using UnityEngine.Rendering;
 
+[RequireComponent(typeof(Camera))]
 public sealed class AsyncZmqCamera : MonoBehaviour
 {
     public string address = "tcp://*:5556";
@@ -26,6 +30,11 @@ public sealed class AsyncZmqCamera : MonoBehaviour
         _rt.flip = new RenderTexture(frameWidth, frameHeight, 0);
         _camera = GetComponent<Camera>();
         _camera.targetTexture = _rt.grab;
+
+        // Use one buffer per frame to give the GPU enough time to write (~1 second)
+        // Or we will run into the problem where the buffer cannot be read:
+        // https://forum.unity.com/threads/asyncgpureadback-requestintonativearray-
+        // causes-invalidoperationexception-on-nativearray.1011955/
 
         _buffers = new NativeArray<byte>[fps];
         for (int i = 0; i < fps; i++)
@@ -52,15 +61,13 @@ public sealed class AsyncZmqCamera : MonoBehaviour
 
     void OnDestroy()
     {
-        _isRunning = false;
-
-        _publisher.Dispose();
-
         AsyncGPUReadback.WaitAllRequests();
         Destroy(_rt.flip);
         Destroy(_rt.grab);
-
         foreach (NativeArray<byte> buffer in _buffers) buffer.Dispose();
+        _publisher.Dispose();
+
+        _isRunning = false;
     }
 
     void OnCompleteReadback(AsyncGPUReadbackRequest request)
